@@ -1,0 +1,107 @@
+import express from "express";
+import cors from 'cors'
+
+import { PrismaClient } from "@prisma/client";
+import { convertHoursStringToMinutes } from "./utils/convert-hour-to-minutes";
+import { convertMinutesToHours } from "./utils/convert-minutes-to-hours";
+
+
+const app = express();
+
+app.use(express.json());
+app.use(cors({
+   //origin : my domain
+}))
+
+const prisma = new PrismaClient({
+   log: ['query']
+})
+
+//RECEBE LISTAGEM DE GAMES
+app.get('/games', async (req, res)=>{
+   const games = await prisma.game.findMany({
+      include:{
+         _count:{
+            select:{
+               ads: true,
+            }
+         }
+      }
+   })
+
+   return res.json(games)
+})
+
+//CRIA ANUNCIO
+app.post('/games/:id/ads', async (req,res) => {
+   const gameId = req.params.id;
+   const body:any = req.body;
+
+   const ad = await prisma.ad.create({
+      data: {
+         gameId,
+         name: body.name,
+         yearsPlaying: body.yearsPlaying,
+         hoursStart: convertHoursStringToMinutes(body.hoursStart),
+         hourEnd: convertHoursStringToMinutes(body.hourEnd),
+         weekDays: body.weekDays.join(','),
+         discord: body.discord,
+         useVoiceChannel: body.useVoiceChannel
+      }
+   })
+
+   return res.status(201).json(ad)
+})
+
+//RECEBE LISTAGEM DE ANUNCIOS
+app.get('/games/:id/ads', async (req,res) => {
+
+   const gameId = req.params.id;
+
+   const ads = await prisma.ad.findMany({
+      select:{
+         id: true,
+         name: true,
+         weekDays: true,
+         useVoiceChannel: true,
+         yearsPlaying: true,
+         hoursStart: true,
+         hourEnd: true
+      },
+      where: {
+         gameId,
+      },
+      orderBy:{
+         createdAt:'desc'
+      }
+   })
+
+   return res.json(ads.map( ad => {
+      return {
+         ...ad, 
+         weekDays: ad.weekDays.split(','),
+         hourStart: convertMinutesToHours(ad.hoursStart),
+         hourEnd: convertMinutesToHours(ad.hourEnd)
+      }
+   }))
+})
+
+
+//RECEBE ID DISCORD PELO GAME
+app.get('/ads/:id/discord', async (req,res) => {
+  const adId = req.params.id;
+
+  const ad = await prisma.ad.findUniqueOrThrow({
+   select:{
+      discord: true,
+   },
+   where:{
+      id: adId,
+   }
+  })
+   
+  return res.json({discord: ad.discord})
+})
+
+
+app.listen(3333)
