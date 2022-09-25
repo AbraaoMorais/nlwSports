@@ -11,9 +11,10 @@ import { styles } from './styles';
 
 export function Home() {
 
+  const API = 'https://nlwsportsbackend.herokuapp.com'
   useEffect(()=>{
-    fetch()
-    .then
+    fetch(`${API}/games`)
+    .then(res=>console.log(res))
 
   },[])
 
